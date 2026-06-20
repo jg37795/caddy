@@ -6801,22 +6801,28 @@ select,
           return clamp(covered, 0, mapR.height - 120);
         }
         // Keep the user pinned at the screen pixel captured when locking.
-        function holdLockedView(latlng, animate) {
-          if (!state.map || !state.lockOffset) return;
-          const z = state.map.getZoom();
-          const size = state.map.getSize();
-          // Desired screen point for the user = center + saved offset.
-          const desiredPt = L.point(
-            size.x / 2 + state.lockOffset.x,
-            size.y / 2 + state.lockOffset.y,
-          );
-          const userPt = state.map.project([latlng.lat, latlng.lng], z);
-          // Map center must shift so the user lands on desiredPt.
-          const centerPt = userPt.subtract(
-            desiredPt.subtract(L.point(size.x / 2, size.y / 2)),
-          );
-          state.map.setView(state.map.unproject(centerPt, z), z, { animate });
-        }
+       function holdLockedView(latlng, animate) {
+  if (!state.map || !state.lockOffset) return;
+  const z = state.map.getZoom();
+  const size = state.map.getSize();
+
+  // Horizontal: keep the locked screen offset (preserves the lock feel).
+  // Vertical: re-flow with the sheet so the dot stays in the clear band,
+  // exactly like FOLLOW does — clamp the locked y-offset above the sheet.
+  const obstruction = bottomObstructionPx();
+  const maxY = size.y / 2 - obstruction - 40; // 40px breathing room above sheet
+  const lockedY = clamp(state.lockOffset.y, -(size.y / 2 - 40), maxY);
+
+  const desiredPt = L.point(
+    size.x / 2 + state.lockOffset.x,
+    size.y / 2 + lockedY,
+  );
+  const userPt = state.map.project([latlng.lat, latlng.lng], z);
+  const centerPt = userPt.subtract(
+    desiredPt.subtract(L.point(size.x / 2, size.y / 2)),
+  );
+  state.map.setView(state.map.unproject(centerPt, z), z, { animate });
+}
         // Center `latlng` in the middle of the visible (un-obstructed) band.
         function centerMapOn(latlng, zoom, animate) {
           if (!state.map) return;
@@ -6981,12 +6987,13 @@ select,
           els.darkToggle.addEventListener("click", () =>
             setDark(!state.prefs.dark),
           );
-          els.gpsChip.addEventListener("click", () => {
-            haptic(8);
-            if (!state.gpsRunning && !state.loc) startGPS();
-            else if (state.loc && !state.locStale) recenterOnUser();
-            else startGPS();
-          });
+          else if (state.loc && !state.locStale) {
+  centerMapOn(
+    { lat: state.loc.lat, lng: state.loc.lng },
+    Math.max(state.map.getZoom(), 16),
+    !reduceMotion,
+  );
+}
           if (els.recenterBtn) {
             attachPressGesture(els.recenterBtn, {
               onTap: recenterOnUser,
