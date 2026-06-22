@@ -434,7 +434,14 @@
       }
       .onboard.hide {
         opacity: 0;
+
+        visibility: hidden;
+
         pointer-events: none;
+
+        transition:
+          opacity 0.5s ease,
+          visibility 0s linear 0.5s;
       }
       .onboard-inner {
         position: relative;
